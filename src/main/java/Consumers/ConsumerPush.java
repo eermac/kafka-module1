@@ -1,3 +1,6 @@
+package Consumers;
+
+import UserMessage.UserMessage;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -12,7 +15,7 @@ public class ConsumerPush {
     public static void main(String[] args) {
         // Настройка консьюмера – адрес сервера, сериализаторы для ключа и значения
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9093,localhost:9094,localhost:9095,localhost:9092");
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "my-consumer-group-1"); //группа консьюмеров для чтения топика
         //параметры десериализации ключа и значения сообщения
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
@@ -24,14 +27,14 @@ public class ConsumerPush {
         // Чтение сообщений
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             // Подписка на топик
-            consumer.subscribe(Collections.singletonList("test_topic"));
+            consumer.subscribe(Collections.singletonList("filtered_messages"));
             while (true) {
                 //обращение к брокеру кафки за сообщениями с интервалом в 0.01 секунд
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10));
                 for (ConsumerRecord<String, String> record : records) {
-                    User userNewData = objectMapper.readValue(record.value(), User.class); //десериализация сообщения
-                    System.out.printf("Получено сообщение: key = %s, user_id = %s, user_name = %s, user_email = %s, offset = %d%n",
-                            record.key(), userNewData.getId(), userNewData.getName(), userNewData.getEmail(), record.offset());
+                    UserMessage userNewData = objectMapper.readValue(record.value(), UserMessage.class); //десериализация сообщения
+                    System.out.printf("Получено сообщение: Отправитель = %s, Получатель = %s, Сообщение = %s, offset = %d%n",
+                            userNewData.getSender(), userNewData.getReceiver(), userNewData.getMessage(), record.offset());
                 }
             }
         } catch (Exception e) {

@@ -1,17 +1,31 @@
 <h1>Инструкция по запуску (с пояснением работы):</h1>
 
-1. Выполнить команду docker-compose up -d (устанавливает и запускает контейнеры)
+1) Создать топики:
+Топик message для отправки сообщений
+   kafka-topics --create --topic message --bootstrap-server localhost:9092 --partitions 3 --replication-factor 2
+Топик filtered_message для отцензуренных сообщений и сообщений без заблокированных пользователей
+   kafka-topics --create --topic filtered_messages --bootstrap-server localhost:9092 --partitions 3 --replication-factor 2
+Топик blocked_users для блокировки пользователей
+   kafka-topics --create --topic blocked_users --bootstrap-server localhost:9092 --partitions 3 --replication-factor 2
+Топик censor_words для цензуры слов
+   kafka-topics --create --topic censor_words --bootstrap-server localhost:9092 --partitions 3 --replication-factor 2
+2) Запускаем приложение consumerPush - это приложение наш "конечный пользователь", который получает 
+отфильтрованные сообщения из топика filtered_messages
+3) Запускаем приложение SimpleKafkaStreamExample - это реализация библиотеки kafka stream. В нем мы превращаем данные 
+в потоки и таблицы, чтобы затем отфильтровать данные в режиме реального времени
+4) Запускаем приложение producerSendMessage - это реализация отправки сообщений. В нем мы отправляем сообщения 
+с задержкой в топик message
+5) В этот момент, приложение SimpleKafkaStreamExample обрабатывает полученные сообщения, проверяет наличие в нем цензуры
+или заблокированных пользователей, но т.к. цензуры еще не было, и никто никого не блокировал, все сообщения дойдут до 
+топика filtered_messages и попадут в приложение consumerPush
+6) Затем добавляем цензуру через работу приложения ProducerAdminCensor (отправляет данные в топик censor_words), 
+также один пользователь блокирует другого через приложение ProducerBlockUser (отправляет данные в топик blocked_users)
+7) Запускаем вновь приложение по отправке данных producerSendMessage, в этот раз в приложении SimpleKafkaStreamExample
+сработает цензура и блокировка пользователя, в результате в топик filtered_messages попадут отфильтрованные сообщения, 
+а сообщения от заблокированного пользователя не дойдут до топика filtered_messages и приложения consumerPush.
 
-2. Проверить, что все контейнеры запущены командой docker ps (должно быть 3 контейнера: 1 zookeeper, 2 kafka)
+Примечание: по какой то причине запуск может сопровождаться ошибкой подключения java.net.UnknownHostException: kafka2,
+но если несколько раз перезапускать приложение, ошибка пропадает (делаю через MacOS и Docker Desktop)
 
-3. В терминале программы docker desktop переключиться на терминал контейнера с кафкой и выполнить команду по созданию
-топика кафки (в моем случае нужно перейти в директорию с kafka-topics):
-cd ..
-cd ..
-cd usr/bin
-kafka-topics --create --topic test_topic --bootstrap-server localhost:9092 --partitions 3 --replication-factor 2
-   (можно также из терминала зайти через команду docker exec -it <id контейнера> /bin)
-4. Убедиться, что топик создан командой: kafka-topics --describe --topic test_topic --bootstrap-server localhost:9092
-5. Запустить консьюмеры (я запускаю из idea) поочередно src/main/java/ConsumerPull, затем src/main/java/ConsumerPush
-6. Затем запустить Producer, который отправляет сообщение в кафку 1 раз, в этот момент можно смотреть пришло ли сообщение
-до consumer кафки через логи в idea. Косньюмеры прочитают сообщение параллельно друг другу.
+Примечание 2: я пытался реализовать выборку заблокированных пользователей через leftjoin stream и table, но по итогу не вышло.
+На мой взгляд мало примеров реализации тех или иных функций в теоретической части.
